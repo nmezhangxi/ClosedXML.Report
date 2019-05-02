@@ -1,6 +1,6 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using ClosedXML.Excel;
@@ -17,7 +17,7 @@ namespace ClosedXML.Report
         private readonly string _alias;
         private readonly FormulaEvaluator _evaluator;
         private readonly TagsEvaluator _tagsEvaluator;
-        private readonly Dictionary<string, object> _variables = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> _variables = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, TagsList> _tags = new Dictionary<string, TagsList>();
         private readonly TemplateErrors _errors;
 
@@ -41,12 +41,8 @@ namespace ClosedXML.Report
         {
             var innerRanges = range.GetContainingNames().Where(nr => _variables.ContainsKey(nr.Name)).ToArray();
             var cells = from c in range.CellsUsed(c => !c.HasFormula
-                                                    && !innerRanges.Any(nr =>
-                                                    {
-                                                           using (var r = nr.Ranges)
-                                                           using (var cr = c.AsRange())
-                                                               return r.Contains(cr);
-                                                    }))
+                                                    && !innerRanges.Any(nr => nr.Ranges.Contains(c.AsRange()))
+                                                 )
                         let value = c.GetString()
                         where (value.StartsWith("<<") || value.EndsWith(">>"))
                         select c;
@@ -97,14 +93,12 @@ namespace ClosedXML.Report
             {
                 AddParameter(parameter.Value);
             }
-            range.Worksheet.SuspendEvents();
             var innerRanges = range.GetContainingNames().Where(nr => _variables.ContainsKey(nr.Name)).ToArray();
             var cells = range.CellsUsed()
                 .Where(c => !c.HasFormula
                             && c.GetString().Contains("{{")
                             && !innerRanges.Any(nr => nr.Ranges.Contains(c.AsRange())))
                 .ToArray();
-            range.Worksheet.ResumeEvents();
 
             foreach (var cell in cells)
             {
@@ -114,7 +108,7 @@ namespace ClosedXML.Report
                     if (value.StartsWith("&="))
                         cell.FormulaA1 = _evaluator.Evaluate(value.Substring(2), pars).ToString();
                     else
-                        cell.Value = _evaluator.Evaluate(value, pars);
+                        cell.SetValue(_evaluator.Evaluate(value, pars));
                 }
                 catch (ParseException ex)
                 {
@@ -136,18 +130,17 @@ namespace ClosedXML.Report
 
             foreach (var nr in innerRanges)
             {
-                var datas = _variables[nr.Name] as IEnumerable;
-                if (datas == null)
+                if (!(_variables[nr.Name] is IEnumerable datas))
                     continue;
 
                 var items = datas as object[] ?? datas.Cast<object>().ToArray();
-                var tplt = RangeTemplate.Parse(nr, _errors);
+                var tplt = RangeTemplate.Parse(nr, _errors, _variables);
                 var nrng = nr.Ranges.First();
                 using (var buff = tplt.Generate(items))
                 {
                     var trgtRng = buff.CopyTo(nrng);
                     nr.SetRefersTo(trgtRng);
-                    
+
                     tplt.RangeTagsApply(trgtRng, items);
                 }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Globalization;
 using System.Linq;
 using System.Linq.Dynamic.Core;
@@ -31,17 +32,18 @@ namespace ClosedXML.Report
 
         public void AddVariable(string name, object value)
         {
-            _variables.Add(name, value);
+            _variables[name]=value;
         }
 
         private string ObjToString(object val)
         {
             if (val == null) val = "";
-            if (val is DateTime)
-                return ((DateTime)val).ToOADate().ToString(CultureInfo.InvariantCulture);
+            if (val is DateTime dateVal)
+                return dateVal.ToOADate().ToString(CultureInfo.InvariantCulture);
 
-            var formattable = val as IFormattable;
-            return formattable != null ? formattable.ToString(null, CultureInfo.InvariantCulture) : val?.ToString();
+            return val is IFormattable formattable
+                ? formattable.ToString(null, CultureInfo.InvariantCulture)
+                : val.ToString();
         }
 
         private IEnumerable<string> GetExpressions(string cellValue)
@@ -52,11 +54,17 @@ namespace ClosedXML.Report
 
         private object Eval(string expression, Parameter[] pars)
         {
-            Delegate lambda;
-            if (!_lambdaCache.TryGetValue(expression, out lambda))
+            if (!_lambdaCache.TryGetValue(expression, out var lambda))
             {
                 var parameters = pars.Select(p=>p.ParameterExpression).ToArray();
-                lambda = DynamicExpressionParser.ParseLambda(parameters, typeof(object), expression, _variables).Compile();
+                try
+                {
+                    lambda = DynamicExpressionParser.ParseLambda(parameters, typeof(object), expression, _variables).Compile();
+                }
+                catch (ArgumentException)
+                {
+                    return null;
+                }
 
                 _lambdaCache.Add(expression, lambda);
             }
@@ -69,11 +77,11 @@ namespace ClosedXML.Report
     {
         public Parameter(string name, object value)
         {
-            ParameterExpression = Expression.Parameter(value.GetType(), name);
+            ParameterExpression = Expression.Parameter(value?.GetType() ?? typeof(string), name);
             Value = value;
         }
 
-        public ParameterExpression ParameterExpression { get; private set; }
-        public object Value { get; private set; }
+        public ParameterExpression ParameterExpression { get; }
+        public object Value { get; }
     }
 }

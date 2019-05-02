@@ -79,7 +79,8 @@ namespace ClosedXML.Report.Tests
                 throw new FileNotFoundException("Gauge file not found.", fileExpected);
             }
 
-            using (var expected = XLWorkbook.OpenFromTemplate(fileExpected))
+            using (var expectStream = File.Open(fileExpected, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using (var expected = new XLWorkbook(expectStream))
             {
                 actual.Worksheets.Count.ShouldBeEquivalentTo(expected.Worksheets.Count, $"Count of worksheets must be {expected.Worksheets.Count}");
 
@@ -124,8 +125,8 @@ namespace ClosedXML.Report.Tests
             if (expected.PageSetup.PageOrder != actual.PageSetup.PageOrder)
                 messages.Add("PageOrder differ");
 
-            var usedCells = expected.CellsUsed(true).Select(c => c.Address)
-                .Concat(actual.CellsUsed(true).Select(c => c.Address))
+            var usedCells = expected.CellsUsed(XLCellsUsedOptions.All).Select(c => c.Address)
+                .Concat(actual.CellsUsed(XLCellsUsedOptions.All).Select(c => c.Address))
                 .Distinct();
             foreach (var address in usedCells)
             {
@@ -145,7 +146,7 @@ namespace ClosedXML.Report.Tests
                     cellsAreEqual = false;
                 }
 
-                if (actualCell.DataType != expectedCell.DataType)
+                if (!expectedCell.HasFormula && actualCell.DataType != expectedCell.DataType)
                 {
                     messages.Add($"Cell data types are not equal starting from {address}");
                     cellsAreEqual = false;
@@ -208,6 +209,18 @@ namespace ClosedXML.Report.Tests
 
                     if (expectedCf.Style.ToString() != actualCf.Style.ToString())
                         messages.Add($"Conditional formats at {actualCf.Range.RangeAddress} have different styles");
+
+                    if (expectedCf.Values.Count != actualCf.Values.Count)
+                        messages.Add($"Conditional formats at {actualCf.Range.RangeAddress} counts differ");
+
+                    for (int j = 1; j <= expectedCf.Values.Count; j++)
+                    {
+                        if (expectedCf.Values[j].Value != actualCf.Values[j].Value)
+                        {
+                            messages.Add($"Conditional formats at {actualCf.Range.RangeAddress} have different values");
+                            break;
+                        }
+                    }
                 }
             }
 

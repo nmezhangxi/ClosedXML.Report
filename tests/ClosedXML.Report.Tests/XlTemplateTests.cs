@@ -32,7 +32,7 @@ namespace ClosedXML.Report.Tests
                 });
         }
 
-        [Fact(Skip = "https://github.com/ClosedXML/ClosedXML/issues/137")]
+        [Fact]
         public void Variables_test()
         {
             XlTemplateTest("7_vars.xlsx",
@@ -87,34 +87,37 @@ namespace ClosedXML.Report.Tests
                 wb =>
                 {
                     var sheet = wb.Worksheet(1);
-                    sheet.Cell("F1").GetValue<string>().Should().Be("title from test");
-                    sheet.Cell("B4").GetValue<string>().Should().Be("John Smith");
-                    sheet.Cell("B5").GetValue<string>().Should().Be("James Smith");
-                    sheet.Cell("B6").GetValue<string>().Should().Be("Jim Smith");
-                    sheet.Cell("C4").GetValue<string>().Should().Be("Developer");
-                    sheet.Cell("C5").GetValue<string>().Should().Be("Analyst");
-                    sheet.Cell("C6").GetValue<string>().Should().Be("Manager");
-                    sheet.Cell("D4").GetValue<int>().Should().Be(24);
-                    sheet.Cell("D5").GetValue<int>().Should().Be(37);
-                    sheet.Cell("D6").GetValue<int>().Should().Be(31);
-                    sheet.Cell("E4").GetValue<string>().Should().Be("NY");
-                    sheet.Cell("E5").GetValue<string>().Should().Be("Dallas");
-                    sheet.Cell("E6").GetValue<string>().Should().Be("Miami");
-                    wb.NamedRange("PlanData").Ranges.First().RangeAddress.ToStringRelative().Should().Be("A4:I6");
-                    sheet.Cell("F4").GetValue<int>().Should().Be(6);
-                    sheet.Cell("F5").GetValue<int>().Should().Be(3);
-                    sheet.Cell("F6").GetValue<int>().Should().Be(2);
-                    sheet.Cell("G4").GetValue<int>().Should().Be(8);
-                    sheet.Cell("G5").GetValue<int>().Should().Be(5);
-                    sheet.Cell("G6").GetValue<int>().Should().Be(9);
-                    sheet.Cell("H4").GetValue<int>().Should().Be(4);
-                    sheet.Cell("H5").GetValue<int>().Should().Be(7);
-                    sheet.Cell("H6").GetValue<int>().Should().Be(1);
-                    sheet.Cell("I4").GetValue<int>().Should().Be(18);
-                    sheet.Cell("I5").GetValue<int>().Should().Be(15);
-                    sheet.Cell("I6").GetValue<int>().Should().Be(12);
+                    sheet.Cell("G1").GetValue<string>().Should().Be("title from test");
+                    sheet.Cell("B4").GetValue<string>().Should().Be("1");
+                    sheet.Cell("B5").GetValue<string>().Should().Be("2");
+                    sheet.Cell("B6").GetValue<string>().Should().Be("3");
+                    sheet.Cell("C4").GetValue<string>().Should().Be("John Smith");
+                    sheet.Cell("C5").GetValue<string>().Should().Be("James Smith");
+                    sheet.Cell("C6").GetValue<string>().Should().Be("Jim Smith");
+                    sheet.Cell("D4").GetValue<string>().Should().Be("Developer");
+                    sheet.Cell("D5").GetValue<string>().Should().Be("Analyst");
+                    sheet.Cell("D6").GetValue<string>().Should().Be("Manager");
+                    sheet.Cell("E4").GetValue<int>().Should().Be(24);
+                    sheet.Cell("E5").GetValue<int>().Should().Be(37);
+                    sheet.Cell("E6").GetValue<int>().Should().Be(31);
+                    sheet.Cell("F4").GetValue<string>().Should().Be("NY");
+                    sheet.Cell("F5").GetValue<string>().Should().Be("Dallas");
+                    sheet.Cell("F6").GetValue<string>().Should().Be("Miami");
+                    wb.NamedRange("PlanData").Ranges.First().RangeAddress.ToStringRelative().Should().Be("A4:J6");
+                    sheet.Cell("G4").GetValue<int>().Should().Be(6);
+                    sheet.Cell("G5").GetValue<int>().Should().Be(3);
+                    sheet.Cell("G6").GetValue<int>().Should().Be(2);
+                    sheet.Cell("H4").GetValue<int>().Should().Be(8);
+                    sheet.Cell("H5").GetValue<int>().Should().Be(5);
+                    sheet.Cell("H6").GetValue<int>().Should().Be(9);
+                    sheet.Cell("I4").GetValue<int>().Should().Be(4);
+                    sheet.Cell("I5").GetValue<int>().Should().Be(7);
+                    sheet.Cell("I6").GetValue<int>().Should().Be(1);
+                    sheet.Cell("J4").GetValue<int>().Should().Be(18);
+                    sheet.Cell("J5").GetValue<int>().Should().Be(15);
+                    sheet.Cell("J6").GetValue<int>().Should().Be(12);
                     sheet.Cell("D8").GetValue<int>().Should().Be(15);
-                    sheet.Cell("J6").GetValue<int>().Should().Be(4);
+                    sheet.Cell("K6").GetValue<int>().Should().Be(4);
                 });
         }
 
@@ -274,6 +277,78 @@ namespace ClosedXML.Report.Tests
 
             Assert.Throws<ObjectDisposedException>(() => template.AddVariable("Test", "test"));
             Assert.Throws<ObjectDisposedException>(() => template.Generate());
+        }
+
+
+        [Fact]
+        public void Leading_zeros_should_not_be_trimmed()
+        {
+            var data = new
+            {
+                Id = "01",
+                Items = new object[] {
+                    new { Id = "001" },
+                    new { Id = "002" },
+                }
+            };
+
+            XlTemplateTest("Leading_Zeros.xlsx",
+                tpl => tpl.AddVariable(data),
+                wb =>
+                {
+                    var sheet = wb.Worksheet(1);
+                    sheet.Cell(2, 2).Value.Should().Be("001");
+                    sheet.Cell(3, 2).Value.Should().Be("002");
+                    sheet.Cell(1, 1).Value.Should().Be("01");
+                });
+        }
+
+        [Fact]
+        public void DictionaryVariableTest()
+        {
+            var dic = new Dictionary<string, object>
+            {
+                { "Customer1", new Dictionary<string, object>{{"ID", "1"}, {"Name", "Customer 1"}}},
+                { "Customer2", new Dictionary<string, object>{{"ID", "2"}, {"Name", "Customer 2"}}},
+                { "Customer3", new Dictionary<string, object>{{"ID", "3"}, {"Name", "Customer 3"}}},
+            };
+
+            XlTemplateTest("DictionarySource.xlsx",
+                tpl => tpl.AddVariable(dic),
+                wb =>
+                {
+                    var sheet = wb.Worksheet(1);
+                    sheet.Cell(1, 1).Value.Should().Be("1");
+                    sheet.Cell(1, 2).Value.Should().Be("Customer 1");
+                    sheet.Cell(2, 1).Value.Should().Be("2");
+                    sheet.Cell(2, 2).Value.Should().Be("Customer 2");
+                    sheet.Cell(3, 1).Value.Should().Be("3");
+                    sheet.Cell(3, 2).Value.Should().Be("Customer 3");
+                });
+        }
+
+        [Fact]
+        public void ListOfDictionariesTest()
+        {
+            var dic = new List<Dictionary<string, object>>
+            {
+                new Dictionary<string, object>{{"ID", "1"}, {"Name", "Customer 1"}},
+                new Dictionary<string, object>{{"ID", "2"}, {"Name", "Customer 2"}},
+                new Dictionary<string, object>{{"ID", "3"}, {"Name", "Customer 3"}},
+            };
+
+            XlTemplateTest("ListDictionariesSource.xlsx",
+                tpl => tpl.AddVariable("Customers", dic),
+                wb =>
+                {
+                    var sheet = wb.Worksheet(1);
+                    sheet.Cell(2, 2).Value.Should().Be("1");
+                    sheet.Cell(2, 3).Value.Should().Be("Customer 1");
+                    sheet.Cell(3, 2).Value.Should().Be("2");
+                    sheet.Cell(3, 3).Value.Should().Be("Customer 2");
+                    sheet.Cell(4, 2).Value.Should().Be("3");
+                    sheet.Cell(4, 3).Value.Should().Be("Customer 3");
+                });
         }
 
         private void ReplaceWorkbookWithMock(XLTemplate template, IXLWorkbook mock)

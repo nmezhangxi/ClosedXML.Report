@@ -4,6 +4,7 @@ using System.Linq.Dynamic.Core;
 using System.Linq.Dynamic.Core.Exceptions;
 using System.Linq.Expressions;
 using FluentAssertions;
+using NSubstitute.ExceptionExtensions;
 using Xunit;
 
 namespace ClosedXML.Report.Tests
@@ -50,11 +51,35 @@ namespace ClosedXML.Report.Tests
         }
 
         [Fact]
+        public void PassNullParameter()
+        {
+            var eval = new FormulaEvaluator();
+            eval.Evaluate("{{\"Hello \"+a}}", new Parameter("a", null)).Should().Be("Hello ");
+            eval.Evaluate("{{1+a}}", new Parameter("a", null)).Should().Be(null);
+            //TODO: eval.Evaluate("{{\"City: \"+Iif(a==null, string.Empty, a.City}}", new Parameter("a", null)).Should().Be("City: ");
+        }
+
+        [Fact]
+        public void WrongExpressionShouldThrowParseException()
+        {
+            var eval = new FormulaEvaluator();
+            Assert.Throws<ParseException>(() => eval.Evaluate("{{missing}}"));
+        }
+
+        [Fact]
         public void ParseExceptionMessageShouldBeUnknownIdentifier()
         {
             var eval = new FormulaEvaluator();
             Assert.Throws<ParseException>(() => eval.Evaluate("{{item.id}}"))
                 .Message.Should().Be("Unknown identifier 'item'");
+        }
+
+        [Fact]
+        public void EvalExpressionVariableWithAt()
+        {
+            var eval = new FormulaEvaluator();
+            eval.AddVariable("@a", 1);
+            eval.Evaluate("{{@a+@a}}").Should().Be(2);
         }
 
         class Customer
